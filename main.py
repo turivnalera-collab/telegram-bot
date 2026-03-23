@@ -179,6 +179,18 @@ nest_asyncio.apply()
 loop = asyncio.get_event_loop()
 loop.create_task(run_both())
 loop.run_forever()
+import asyncio
+import nest_asyncio
+
+nest_asyncio.apply()
+
+async def main():
+    await run_both()
+
+if __name__ == "__main__":
+    loop = asyncio.get_event_loop()
+    loop.create_task(main())
+    loop.run_forever()
 
 
 
