@@ -172,7 +172,14 @@ async def run_both():
     await asyncio.gather(t1, t2)
 
 import asyncio
-asyncio.run(run_both())
+import nest_asyncio
+import asyncio
+
+nest_asyncio.apply()
+loop = asyncio.get_event_loop()
+loop.create_task(run_both())
+loop.run_forever()
+
 
 
 
