@@ -18,27 +18,32 @@ STATE_FILE = "state.json"
 
 (FROM_WHERE, PHONE_TYPE, GAME_TYPE, CONFIRM) = range(4)
 
-# =================== Работа с состоянием ===================
 def get_state():
     try:
         with open(STATE_FILE, "r") as f:
             return json.load(f)
     except:
         s = {"active": True, "users": 0, "user_ids": []}
-        with open(STATE_FILE, "w") as f: json.dump(s, f)
+        with open(STATE_FILE, "w") as f:
+            json.dump(s, f)
         return s
 
 def set_active(v: bool):
-    s = get_state(); s["active"] = v
-    with open(STATE_FILE, "w") as f: json.dump(s, f)
+    s = get_state()
+    s["active"] = v
+    with open(STATE_FILE, "w") as f:
+        json.dump(s, f)
 
 def is_active(): return get_state().get("active", True)
 
 def update_user(uid):
-    s = get_state(); s.setdefault("user_ids", [])
+    s = get_state()
+    s.setdefault("user_ids", [])
     if uid not in s["user_ids"]:
-        s["user_ids"].append(uid); s["users"] = len(s["user_ids"])
-        with open(STATE_FILE, "w") as f: json.dump(s, f)
+        s["user_ids"].append(uid)
+        s["users"] = len(s["user_ids"])
+        with open(STATE_FILE, "w") as f:
+            json.dump(s, f)
 
 async def block_if_off(update: Update):
     if not is_active():
@@ -47,7 +52,8 @@ async def block_if_off(update: Update):
     return False
 
 async def start(update: Update, ctx):
-    if await block_if_off(update): return ConversationHandler.END
+    if await block_if_off(update):
+        return ConversationHandler.END
     update_user(update.effective_user.id)
     await update.message.reply_text("Привет! 👋 Заполни короткую заявку 📋")
     countries = [['Украина 🇺🇦'], ['Казахстан 🇰🇿'], ['Россия 🇷🇺'], ['Другое 🌐']]
@@ -55,14 +61,16 @@ async def start(update: Update, ctx):
     return FROM_WHERE
 
 async def from_where(update: Update, ctx):
-    if await block_if_off(update): return ConversationHandler.END
+    if await block_if_off(update):
+        return ConversationHandler.END
     ctx.user_data["country"] = update.message.text
     phones = [['iOS 🍎'], ['Android 🤖']]
     await update.message.reply_text("Какой у вас телефон?", reply_markup={"keyboard": phones, "resize_keyboard": True, "one_time_keyboard": True})
     return PHONE_TYPE
 
 async def phone(update: Update, ctx):
-    if await block_if_off(update): return ConversationHandler.END
+    if await block_if_off(update):
+        return ConversationHandler.END
     ctx.user_data["phone"] = update.message.text
     if update.message.text == "Android 🤖":
         c = ctx.user_data.get("country", "—")
@@ -75,7 +83,8 @@ async def phone(update: Update, ctx):
     return GAME_TYPE
 
 async def game(update: Update, ctx):
-    if await block_if_off(update): return ConversationHandler.END
+    if await block_if_off(update):
+        return ConversationHandler.END
     ctx.user_data["game"] = update.message.text
     c = ctx.user_data.get("country", "—")
     p = ctx.user_data.get("phone", "—")
@@ -166,9 +175,6 @@ async def run_both():
     await asyncio.sleep(2)
     t2 = asyncio.create_task(main_admin())
     await asyncio.gather(t1, t2)
-
-import asyncio
-import nest_asyncio
 
 nest_asyncio.apply()
 
