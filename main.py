@@ -1,19 +1,20 @@
 import json, asyncio
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
     ConversationHandler, CallbackQueryHandler,
     ContextTypes, filters
 )
 
-TOKEN_MAIN = "8265115212:AAHkqg6km67v_GJOTpjKVHTW8pKy6zSXbUc"
-TOKEN_ADMIN = "8629071305:AAEWcYh4KQgDOcJdJxy1XjKzNc7aEZm2ZpY"
+# === Настройки ===
+TOKEN = "8265115212:AAHkqg6km67v_GJOTpjKVHTW8pKy6zSXbUc"   # ← подставь свой
 ADMIN_ID = 607368382
 ADMIN_CHANNEL_ID = -1003568920377
 STATE_FILE = "state.json"
 
 (FROM_WHERE, PHONE_TYPE, GAME_TYPE, CONFIRM) = range(4)
 
+# === Работа с состоянием ===
 def get_state():
     try:
         with open(STATE_FILE, "r") as f:
@@ -41,14 +42,14 @@ def update_user(uid):
         with open(STATE_FILE, "w") as f:
             json.dump(s, f)
 
-# ==== Основной бот ====
+# === Основные диалоги ===
 async def block_if_off(update: Update):
     if not is_active():
         await update.message.reply_text("🚫 Бот временно выключен администратором.")
         return True
     return False
 
-async def start(update: Update, ctx):
+async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if await block_if_off(update):
         return ConversationHandler.END
     update_user(update.effective_user.id)
@@ -60,7 +61,7 @@ async def start(update: Update, ctx):
     )
     return FROM_WHERE
 
-async def from_where(update: Update, ctx):
+async def from_where(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     ctx.user_data["country"] = update.message.text
     phones = [["iOS 🍎"], ["Android 🤖"]]
     await update.message.reply_text(
@@ -69,13 +70,15 @@ async def from_where(update: Update, ctx):
     )
     return PHONE_TYPE
 
-async def phone(update: Update, ctx):
+async def phone(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     ctx.user_data["phone"] = update.message.text
     if ctx.user_data["phone"] == "Android 🤖":
         c = ctx.user_data.get("country", "—")
         text = f"🎉 Заявка:\n🌍 {c}\n📱 Android 🤖\n💵 Платно"
         await update.message.reply_text(
-            text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📩 Отправить", callback_data="send_admin")]])
+            text, reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("📩 Отправить", callback_data="send_admin")]]
+            )
         )
         return CONFIRM
     games = [["Standoff 🔫"], ["PUBG 🎯"], ["Clash of Clans ⚔️"]]
@@ -85,18 +88,20 @@ async def phone(update: Update, ctx):
     )
     return GAME_TYPE
 
-async def game(update: Update, ctx):
+async def game(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     ctx.user_data["game"] = update.message.text
     c = ctx.user_data.get("country", "—")
     p = ctx.user_data.get("phone", "—")
     g = ctx.user_data["game"]
     text = f"🎉 Заявка:\n🌍 {c}\n📱 {p}\n🎮 {g}"
     await update.message.reply_text(
-        text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📩 Отправить", callback_data="send_admin")]])
+        text, reply_markup=InlineKeyboardMarkup(
+            [[InlineKeyboardButton("📩 Отправить", callback_data="send_admin")]]
+        )
     )
     return CONFIRM
 
-async def send_admin(update: Update, ctx):
+async def send_admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     user = q.from_user
@@ -109,8 +114,8 @@ async def send_admin(update: Update, ctx):
     await q.edit_message_text("✅ Отправлено администратору!")
     return ConversationHandler.END
 
-# ==== Админ-бот ====
-async def cmd_start(update: Update, ctx):
+# === Команды администратора ===
+async def admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return await update.message.reply_text("⛔ Нет доступа.")
     kb = [
@@ -123,7 +128,7 @@ async def cmd_start(update: Update, ctx):
     st = "🟢 ВКЛЮЧЕН" if is_active() else "🔴 ВЫКЛЮЧЕН"
     await update.message.reply_text(f"⚙️ Панель администратора\nСтатус: {st}", reply_markup=InlineKeyboardMarkup(kb))
 
-async def panel(update: Update, ctx):
+async def panel(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     if q.from_user.id != ADMIN_ID:
@@ -142,10 +147,9 @@ async def panel(update: Update, ctx):
     ]
     await q.edit_message_text(f"{t}\n⚙️ Панель администратора", reply_markup=InlineKeyboardMarkup(kb))
 
-# ==== Запуск обоих ====
+# === Запуск ===
 async def main():
-    main_app = Application.builder().token(TOKEN_MAIN).build()
-    admin_app = Application.builder().token(TOKEN_ADMIN).build()
+    app = Application.builder().token(TOKEN).build()
 
     conv = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
@@ -157,26 +161,16 @@ async def main():
         },
         fallbacks=[]
     )
-    main_app.add_handler(conv)
-    admin_app.add_handler(CommandHandler("start", cmd_start))
-    admin_app.add_handler(CallbackQueryHandler(panel))
+    app.add_handler(conv)
+    app.add_handler(CommandHandler("admin", admin))
+    app.add_handler(CallbackQueryHandler(panel))
 
-    print("🟢 Приложения создаются...")
-
-    # ↓ вот эти две строки тоже должны иметь 4 пробела!
-    await main_app.initialize()
-    await admin_app.initialize()
-
-    print("🚀 Боты запускаются...")
-    await asyncio.gather(
-        main_app.start(),
-        admin_app.start(),
-        main_app.updater.start_polling(),
-        admin_app.updater.start_polling(),
-    )
+    print("🚀 Бот запущен…")
+    await app.run_polling()
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
