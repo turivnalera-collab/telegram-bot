@@ -189,6 +189,7 @@ async def run_both():
     url_main = f"[{heroku_app_name}.herokuapp.com](https://{HEROKU_APP_NAME}.herokuapp.com/{TOKEN_MAIN})"
     url_admin = f"[{heroku_app_name}.herokuapp.com](https://{HEROKU_APP_NAME}.herokuapp.com/{TOKEN_ADMIN})"
 
+
     await main.bot.setWebhook(url=url_main)
     await admin.bot.setWebhook(url=url_admin)
     print("🌐 Вебхуки установлены")
