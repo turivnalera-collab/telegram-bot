@@ -8,6 +8,7 @@ from telegram.ext import (
     ContextTypes, filters
 )
 
+# ==== Конфигурация ====
 TOKEN_MAIN = "8265115212:AAHkqg6km67v_GJOTpjKVHTW8pKy6zSXbUc"
 TOKEN_ADMIN = "8629071305:AAEWcYh4KQgDOcJdJxy1XjKzNc7aEZm2ZpY"
 ADMIN_ID = 607368382
@@ -16,7 +17,8 @@ STATE_FILE = "state.json"
 
 (FROM_WHERE, PHONE_TYPE, GAME_TYPE, CONFIRM) = range(4)
 
-# ---------- Работа с состоянием ----------
+
+# ==== Работа с состоянием ====
 def get_state():
     try:
         with open(STATE_FILE, "r") as f:
@@ -45,7 +47,8 @@ def update_user(uid):
         with open(STATE_FILE, "w") as f:
             json.dump(s, f)
 
-# ---------- Основной бот ----------
+
+# ==== Основной бот ====
 async def block_if_off(update: Update):
     if not is_active():
         await update.message.reply_text("🚫 Бот временно выключен администратором.")
@@ -126,23 +129,8 @@ async def send_admin(update: Update, ctx):
         await q.edit_message_text(f"⚠️ Ошибка: {e}")
     return ConversationHandler.END
 
-async def main_bot():
-    app = Application.builder().token(TOKEN_MAIN).build()
-    conv = ConversationHandler(
-        entry_points=[CommandHandler("start", start)],
-        states={
-            FROM_WHERE: [MessageHandler(filters.TEXT & ~filters.COMMAND, from_where)],
-            PHONE_TYPE: [MessageHandler(filters.TEXT & ~filters.COMMAND, phone)],
-            GAME_TYPE: [MessageHandler(filters.TEXT & ~filters.COMMAND, game)],
-            CONFIRM: [CallbackQueryHandler(send_admin, pattern="send_admin")]
-        },
-        fallbacks=[]
-    )
-    app.add_handler(conv)
-    print("🟢 Основной бот запущен.")
-    await app.run_polling()
 
-# ---------- Админ-бот ----------
+# ==== Админ бот ====
 async def require_admin(update):
     return update.effective_user.id == ADMIN_ID
 
@@ -186,23 +174,48 @@ async def panel(update: Update, ctx):
     ]
     await q.edit_message_text(f"{text}\n\n⚙️ Панель администратора", reply_markup=InlineKeyboardMarkup(kb))
 
-async def main_admin():
-    app = Application.builder().token(TOKEN_ADMIN).build()
-    app.add_handler(CommandHandler("start", cmd_start))
-    app.add_handler(CallbackQueryHandler(panel))
-    print("🛠 Админ-бот с панелью запущен.")
-    await app.run_polling()
 
-# ---------- Запуск обоих ----------
+# ==== Совместный запуск ====
 async def run_both():
-    # Запускаем оба бота параллельно
-    task1 = asyncio.create_task(main_bot())
-    await asyncio.sleep(2)  # даем основному боту стартануть первым
-    task2 = asyncio.create_task(main_admin())
-    await asyncio.gather(task1, task2)
+    # Создаем приложения
+    main_app = Application.builder().token(TOKEN_MAIN).build()
+    admin_app = Application.builder().token(TOKEN_ADMIN).build()
+
+    # Основной бот — добавляем ConversationHandler
+    conv = ConversationHandler(
+        entry_points=[CommandHandler("start", start)],
+        states={
+            FROM_WHERE: [MessageHandler(filters.TEXT & ~filters.COMMAND, from_where)],
+            PHONE_TYPE: [MessageHandler(filters.TEXT & ~filters.COMMAND, phone)],
+            GAME_TYPE: [MessageHandler(filters.TEXT & ~filters.COMMAND, game)],
+            CONFIRM: [CallbackQueryHandler(send_admin, pattern="send_admin")]
+        },
+        fallbacks=[]
+    )
+    main_app.add_handler(conv)
+
+    # Админ‑панель — добавляем свои handlers
+    admin_app.add_handler(CommandHandler("start", cmd_start))
+    admin_app.add_handler(CallbackQueryHandler(panel))
+
+    # Инициализация без закрытия loop
+    await main_app.initialize()
+    await admin_app.initialize()
+    await main_app.start()
+    await admin_app.start()
+
+    print("✅ Оба бота запущены!")
+
+    # Запуск polling в фоне
+    task_main = asyncio.create_task(main_app.updater.start_polling())
+    task_admin = asyncio.create_task(admin_app.updater.start_polling())
+
+    await asyncio.gather(task_main, task_admin)
+
 
 if __name__ == "__main__":
     asyncio.run(run_both())
+
 
 
 
