@@ -12,13 +12,12 @@ nest_asyncio.apply()
 
 TOKEN_MAIN = "8265115212:AAHkqg6km67v_GJOTpjKVHTW8pKy6zSXbUc"
 TOKEN_ADMIN = "8629071305:AAEWcYh4KQgDOcJdJxy1XjKzNc7aEZm2ZpY"
-ADMIN_ID = 607368382  # твой Telegram ID
-ADMIN_CHANNEL_ID = -1003568920377  # ID канала/группы
+ADMIN_ID = 607368382
+ADMIN_CHANNEL_ID = -1003568920377
 STATE_FILE = "state.json"
 
 (FROM_WHERE, PHONE_TYPE, GAME_TYPE, CONFIRM) = range(4)
 
-# =================== Работа с состоянием ===================
 def get_state():
     try:
         with open(STATE_FILE, "r") as f:
@@ -40,7 +39,6 @@ def update_user(uid):
         s["user_ids"].append(uid); s["users"] = len(s["user_ids"])
         with open(STATE_FILE, "w") as f: json.dump(s, f)
 
-# =================== ОСНОВНОЙ БОТ ===================
 async def block_if_off(update: Update):
     if not is_active():
         await update.message.reply_text("🚫 Бот временно выключен администратором.")
@@ -100,7 +98,21 @@ async def send_admin(update: Update, ctx):
         await q.edit_message_text(f"⚠️ Ошибка: {e}")
     return ConversationHandler.END
 
-# =================== АДМИН-БОТ С ПАНЕЛЬЮ ===================
+async def main_bot():
+    app = Application.builder().token(TOKEN_MAIN).build()
+    conv = ConversationHandler(
+        entry_points=[CommandHandler("start", start)],
+        states={
+            FROM_WHERE: [MessageHandler(filters.TEXT & ~filters.COMMAND, from_where)],
+            PHONE_TYPE: [MessageHandler(filters.TEXT & ~filters.COMMAND, phone)],
+            GAME_TYPE: [MessageHandler(filters.TEXT & ~filters.COMMAND, game)],
+            CONFIRM: [CallbackQueryHandler(send_admin, pattern="send_admin")]
+        }, fallbacks=[]
+    )
+    app.add_handler(conv)
+    print("🟢 Основной бот запущен.")
+    await app.run_polling()
+
 async def require_admin(update):
     return update.effective_user.id == ADMIN_ID
 
@@ -148,7 +160,6 @@ async def main_admin():
     print("🛠 Админ-бот с панелью запущен.")
     await app.run_polling()
 
-# =================== Запуск обоих ===================
 async def run_both():
     t1 = asyncio.create_task(main_bot())
     await asyncio.sleep(2)
