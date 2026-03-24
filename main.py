@@ -8,7 +8,7 @@ from telegram.ext import (
     ContextTypes, filters
 )
 
-nest_asyncio.apply()
+nest_asyncio.apply()  # Это важно, чтобы asyncio работал в окружении Heroku
 
 TOKEN_MAIN = "8265115212:AAHkqg6km67v_GJOTpjKVHTW8pKy6zSXbUc"
 TOKEN_ADMIN = "8629071305:AAEWcYh4KQgDOcJdJxy1XjKzNc7aEZm2ZpY"
@@ -34,7 +34,8 @@ def set_active(v: bool):
     with open(STATE_FILE, "w") as f:
         json.dump(s, f)
 
-def is_active(): return get_state().get("active", True)
+def is_active(): 
+    return get_state().get("active", True)
 
 def update_user(uid):
     s = get_state()
@@ -170,6 +171,7 @@ async def main_admin():
     print("🛠 Админ-бот с панелью запущен.")
     await app.run_polling()
 
+# =================== Запуск обоих ===================
 async def run_both():
     t1 = asyncio.create_task(main_bot())
     await asyncio.sleep(2)
@@ -178,18 +180,11 @@ async def run_both():
 
 nest_asyncio.apply()
 
-async def run_both():
-    task1 = asyncio.create_task(main_bot())
-    await asyncio.sleep(2)
-    task2 = asyncio.create_task(main_admin())
-    await asyncio.gather(task1, task2)
-
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
     loop.create_task(run_both())
     print("Бот запущен и работает бесконечно 🚀")
     loop.run_forever()
-
 
 
 
