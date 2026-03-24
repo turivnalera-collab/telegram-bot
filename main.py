@@ -18,6 +18,7 @@ STATE_FILE = "state.json"
 
 (FROM_WHERE, PHONE_TYPE, GAME_TYPE, CONFIRM) = range(4)
 
+# =================== Работа с состоянием ===================
 def get_state():
     try:
         with open(STATE_FILE, "r") as f:
