@@ -162,14 +162,14 @@ async def main():
     admin_app.add_handler(CommandHandler("start", cmd_start))
     admin_app.add_handler(CallbackQueryHandler(panel))
 
-  print("🟢 Оба приложения инициализированы")
+    print("🟢 Оба приложения инициализированы")
+    await asyncio.gather(
+        main_app.start(),
+        admin_app.start(),
+        main_app.updater.start_polling(),
+        admin_app.updater.start_polling(),
+    )
 
-await asyncio.gather(
-    main_app.start(),
-    admin_app.start(),
-    main_app.updater.start_polling(),
-    admin_app.updater.start_polling(),
-)
 
 if __name__ == "__main__":
     asyncio.run(main())
