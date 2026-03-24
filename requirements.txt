@@ -4,6 +4,6 @@ httpcore==0.17.0
 certifi
 asyncio
 nest_asyncio
-aiohttp
+
 
 
