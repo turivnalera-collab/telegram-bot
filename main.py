@@ -176,12 +176,16 @@ async def panel(update: Update, ctx):
 
 
 # ==== Совместный запуск ====
+import os
+from telegram.ext import Application
+
+HEROKU_APP_NAME = "my-telegram"  # замени на имя твоего Heroku-приложения
+PORT = int(os.environ.get('PORT', 8443))
+
 async def run_both():
-    # Создаем приложения
     main_app = Application.builder().token(TOKEN_MAIN).build()
     admin_app = Application.builder().token(TOKEN_ADMIN).build()
 
-    # Основной бот — добавляем ConversationHandler
     conv = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
@@ -194,27 +198,43 @@ async def run_both():
     )
     main_app.add_handler(conv)
 
-    # Админ‑панель — добавляем свои handlers
     admin_app.add_handler(CommandHandler("start", cmd_start))
     admin_app.add_handler(CallbackQueryHandler(panel))
 
-    # Инициализация без закрытия loop
     await main_app.initialize()
     await admin_app.initialize()
+
+    print("✅ Оба бота инициализированы")
+
+    # Webhook URL
+    webhook_url_main = f"[{heroku_app_name}.herokuapp.com](https://{HEROKU_APP_NAME}.herokuapp.com/{TOKEN_MAIN})"
+    webhook_url_admin = f"[{heroku_app_name}.herokuapp.com](https://{HEROKU_APP_NAME}.herokuapp.com/{TOKEN_ADMIN})"
+
+    await main_app.bot.setWebhook(url=webhook_url_main)
+    await admin_app.bot.setWebhook(url=webhook_url_admin)
+
     await main_app.start()
     await admin_app.start()
 
-    print("✅ Оба бота запущены!")
+    print(f"🌐 Вебхуки выставлены:\n{webhook_url_main}\n{webhook_url_admin}")
 
-    # Запуск polling в фоне
-    task_main = asyncio.create_task(main_app.updater.start_polling())
-    task_admin = asyncio.create_task(admin_app.updater.start_polling())
+    from aiohttp import web
+    app = web.Application()
+    app.add_routes([
+        web.post(f"/{TOKEN_MAIN}", main_app.webhook_handler),
+        web.post(f"/{TOKEN_ADMIN}", admin_app.webhook_handler),
+    ])
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", PORT)
+    await site.start()
 
-    await asyncio.gather(task_main, task_admin)
-
+    print(f"🚀 Слушаем порт {PORT} на Heroku...")
+    await asyncio.Event().wait()  # держим приложение живым
 
 if __name__ == "__main__":
     asyncio.run(run_both())
+
 
 
 
