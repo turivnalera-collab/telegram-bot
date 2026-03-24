@@ -1,12 +1,12 @@
-import json, asyncio, nest_asyncio
+import json
+import nest_asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
-    ConversationHandler, CallbackQueryHandler,
-    ContextTypes, filters
+    ConversationHandler, CallbackQueryHandler, ContextTypes, filters
 )
 
-# Применяем патч для Heroku — решает ошибку event loop
+# Исправление для Heroku / event loop
 nest_asyncio.apply()
 
 TOKEN = "8265115212:AAHkqg6km67v_GJOTpjKVHTW8pKy6zSXbUc"
@@ -16,7 +16,6 @@ STATE_FILE = "state.json"
 
 (FROM_WHERE, PHONE_TYPE, GAME_TYPE, CONFIRM) = range(4)
 
-# === Работа с JSON-состоянием ===
 def get_state():
     try:
         with open(STATE_FILE, "r") as f:
@@ -44,15 +43,10 @@ def update_user(uid):
         with open(STATE_FILE, "w") as f:
             json.dump(s, f)
 
-# === Основной диалог пользователя ===
-async def block_if_off(update: Update):
+# --- Хендлеры пользователя ---
+async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_active():
         await update.message.reply_text("🚫 Бот временно выключен администратором.")
-        return True
-    return False
-
-async def start(update: Update, ctx):
-    if await block_if_off(update):
         return ConversationHandler.END
     update_user(update.effective_user.id)
     countries = [["Украина 🇺🇦"], ["Казахстан 🇰🇿"], ["Россия 🇷🇺"], ["Другое 🌐"]]
@@ -63,7 +57,7 @@ async def start(update: Update, ctx):
     )
     return FROM_WHERE
 
-async def from_where(update: Update, ctx):
+async def from_where(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     ctx.user_data["country"] = update.message.text
     phones = [["iOS 🍎"], ["Android 🤖"]]
     await update.message.reply_text(
@@ -72,13 +66,16 @@ async def from_where(update: Update, ctx):
     )
     return PHONE_TYPE
 
-async def phone(update: Update, ctx):
+async def phone(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     ctx.user_data["phone"] = update.message.text
     if ctx.user_data["phone"] == "Android 🤖":
         c = ctx.user_data.get("country", "—")
         text = f"🎉 Заявка:\n🌍 {c}\n📱 Android 🤖\n💵 Платно"
         await update.message.reply_text(
-            text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📩 Отправить", callback_data="send_admin")]])
+            text,
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("📩 Отправить", callback_data="send_admin")]
+            ])
         )
         return CONFIRM
     games = [["Standoff 🔫"], ["PUBG 🎯"], ["Clash of Clans ⚔️"]]
@@ -88,32 +85,33 @@ async def phone(update: Update, ctx):
     )
     return GAME_TYPE
 
-async def game(update: Update, ctx):
+async def game(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     ctx.user_data["game"] = update.message.text
-    c = ctx.user_data.get("country", "—")
-    p = ctx.user_data.get("phone", "—")
-    g = ctx.user_data["game"]
+    c, p, g = ctx.user_data.get("country", "—"), ctx.user_data.get("phone", "—"), ctx.user_data["game"]
     text = f"🎉 Заявка:\n🌍 {c}\n📱 {p}\n🎮 {g}"
     await update.message.reply_text(
-        text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📩 Отправить", callback_data="send_admin")]])
+        text,
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("📩 Отправить", callback_data="send_admin")]
+        ])
     )
     return CONFIRM
 
-async def send_admin(update: Update, ctx):
+async def send_admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     user = q.from_user
     d = ctx.user_data
     msg = (
         f"📬 Заявка от @{user.username or user.full_name}\n"
-        f"🌍 {d.get('country', '—')}\n📱 {d.get('phone', '—')}\n🎮 {d.get('game', '—')}"
+        f"🌍 {d.get('country','—')}\n📱 {d.get('phone','—')}\n🎮 {d.get('game','—')}"
     )
     await ctx.bot.send_message(ADMIN_CHANNEL_ID, msg)
     await q.edit_message_text("✅ Отправлено администратору!")
     return ConversationHandler.END
 
-# === Админка ===
-async def admin(update: Update, ctx):
+# --- Админка ---
+async def admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return await update.message.reply_text("⛔ Нет доступа.")
     kb = [
@@ -125,29 +123,24 @@ async def admin(update: Update, ctx):
     await update.message.reply_text(f"⚙️ Панель администратора\nСтатус: {st}",
                                     reply_markup=InlineKeyboardMarkup(kb))
 
-async def panel(update: Update, ctx):
+async def panel(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     if q.from_user.id != ADMIN_ID:
         return await q.edit_message_text("⛔ Нет доступа.")
     if q.data == "on":
-        set_active(True)
-        t = "✅ Включён"
+        set_active(True); t = "✅ Включён"
     elif q.data == "off":
-        set_active(False)
-        t = "🚫 Выключен"
+        set_active(False); t = "🚫 Выключен"
     else:
         t = "📊 Статус: " + ("🟢 ВКЛЮЧЕН" if is_active() else "🔴 ВЫКЛЮЧЕН")
-
     kb = [
-        [InlineKeyboardButton("🟢 Включить", callback_data="on"),
-         InlineKeyboardButton("🔴 Выключить", callback_data="off")],
+        [InlineKeyboardButton("🟢 Включить", callback_data="on"), InlineKeyboardButton("🔴 Выключить", callback_data="off")],
         [InlineKeyboardButton("📊 Статус", callback_data="status")]
     ]
-    await q.edit_message_text(f"{t}\n⚙️ Панель администратора",
-                              reply_markup=InlineKeyboardMarkup(kb))
+    await q.edit_message_text(f"{t}\n⚙️ Панель администратора", reply_markup=InlineKeyboardMarkup(kb))
 
-# === Запуск ===
+# --- Запуск ---
 def run():
     app = Application.builder().token(TOKEN).build()
 
@@ -166,10 +159,11 @@ def run():
     app.add_handler(CallbackQueryHandler(panel))
 
     print("🚀 Бот запущен…")
-    app.run_polling(close_loop=False)  # ключевой параметр для Heroku
+    app.run_polling(close_loop=False)
 
 if __name__ == "__main__":
     run()
+
 
 
 
