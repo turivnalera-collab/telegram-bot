@@ -1,22 +1,22 @@
-import json, asyncio
-from telegram import (
-    Update, InlineKeyboardMarkup, InlineKeyboardButton
-)
+import json, asyncio, os
+from aiohttp import web
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
     ConversationHandler, CallbackQueryHandler,
     ContextTypes, filters
 )
 
-# ==== Конфигурация ====
-TOKEN_MAIN = "8265115212:AAHkqg6km67v_GJOTpjKVHTW8pKy6zSXbUc"
-TOKEN_ADMIN = "8629071305:AAEWcYh4KQgDOcJdJxy1XjKzNc7aEZm2ZpY"
+# ==== Настройки ====
+TOKEN_MAIN = "твой_основной_токен"
+TOKEN_ADMIN = "твой_админ_токен"
 ADMIN_ID = 607368382
 ADMIN_CHANNEL_ID = -1003568920377
+HEROKU_APP_NAME = "my-telegram"  # имя твоего приложения на Heroku
+PORT = int(os.environ.get("PORT", 8443))
 STATE_FILE = "state.json"
 
 (FROM_WHERE, PHONE_TYPE, GAME_TYPE, CONFIRM) = range(4)
-
 
 # ==== Работа с состоянием ====
 def get_state():
@@ -35,18 +35,15 @@ def set_active(v: bool):
     with open(STATE_FILE, "w") as f:
         json.dump(s, f)
 
-def is_active():
-    return get_state().get("active", True)
+def is_active(): return get_state().get("active", True)
 
 def update_user(uid):
     s = get_state()
-    s.setdefault("user_ids", [])
-    if uid not in s["user_ids"]:
+    if uid not in s.get("user_ids", []):
         s["user_ids"].append(uid)
         s["users"] = len(s["user_ids"])
         with open(STATE_FILE, "w") as f:
             json.dump(s, f)
-
 
 # ==== Основной бот ====
 async def block_if_off(update: Update):
@@ -56,181 +53,117 @@ async def block_if_off(update: Update):
     return False
 
 async def start(update: Update, ctx):
-    if await block_if_off(update):
-        return ConversationHandler.END
+    if await block_if_off(update): return ConversationHandler.END
     update_user(update.effective_user.id)
     await update.message.reply_text("Привет! 👋 Заполни короткую заявку 📋")
-    countries = [['Украина 🇺🇦'], ['Казахстан 🇰🇿'], ['Россия 🇷🇺'], ['Другое 🌐']]
-    await update.message.reply_text(
-        "Откуда вы?",
-        reply_markup={"keyboard": countries, "resize_keyboard": True, "one_time_keyboard": True}
-    )
+    keyboard = [["Украина 🇺🇦"], ["Казахстан 🇰🇿"], ["Россия 🇷🇺"], ["Другое 🌐"]]
+    await update.message.reply_text("Откуда вы?", 
+        reply_markup={"keyboard": keyboard, "resize_keyboard": True, "one_time_keyboard": True})
     return FROM_WHERE
 
 async def from_where(update: Update, ctx):
-    if await block_if_off(update):
-        return ConversationHandler.END
+    if await block_if_off(update): return ConversationHandler.END
     ctx.user_data["country"] = update.message.text
-    phones = [['iOS 🍎'], ['Android 🤖']]
+    phones = [["iOS 🍎"], ["Android 🤖"]]
     await update.message.reply_text(
         "Какой у вас телефон?",
-        reply_markup={"keyboard": phones, "resize_keyboard": True, "one_time_keyboard": True}
-    )
+        reply_markup={"keyboard": phones, "resize_keyboard": True, "one_time_keyboard": True})
     return PHONE_TYPE
 
 async def phone(update: Update, ctx):
-    if await block_if_off(update):
-        return ConversationHandler.END
+    if await block_if_off(update): return ConversationHandler.END
     ctx.user_data["phone"] = update.message.text
-    if update.message.text == "Android 🤖":
+    if ctx.user_data["phone"] == "Android 🤖":
         c = ctx.user_data.get("country", "—")
-        card = (
-            f"🎉 Новая заявка от {update.effective_user.username or update.effective_user.full_name}:\n\n"
-            f"🌍 Страна: {c}\n📱 Устройство: Android 🤖\n💵 Платно\n\n📨 Отправить заявку администратору?"
-        )
-        kb = InlineKeyboardMarkup([[InlineKeyboardButton("📩 Отправить", callback_data="send_admin")]])
-        await update.message.reply_text(card, reply_markup=kb)
+        text = f"🎉 Новая заявка от {update.effective_user.full_name}:\n🌍 {c}\n📱 Android 🤖\n💵 Платно"
+        kb = [[InlineKeyboardButton("📩 Отправить", callback_data="send_admin")]]
+        await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(kb))
         return CONFIRM
-    games = [['Standoff 🔫'], ['PUBG 🎯'], ['Clash of Clans ⚔️']]
+    games = [["Standoff 🔫"], ["PUBG 🎯"], ["Clash of Clans ⚔️"]]
     await update.message.reply_text(
-        "На какую игру нужен софт? 🎮",
-        reply_markup={"keyboard": games, "resize_keyboard": True, "one_time_keyboard": True}
-    )
+        "На какую игру нужен софт?",
+        reply_markup={"keyboard": games, "resize_keyboard": True, "one_time_keyboard": True})
     return GAME_TYPE
 
 async def game(update: Update, ctx):
-    if await block_if_off(update):
-        return ConversationHandler.END
+    if await block_if_off(update): return ConversationHandler.END
     ctx.user_data["game"] = update.message.text
-    c = ctx.user_data.get("country", "—")
-    p = ctx.user_data.get("phone", "—")
-    g = ctx.user_data.get("game", "—")
-    card = (
-        f"🎉 Новая заявка от {update.effective_user.username or update.effective_user.full_name}:\n\n"
-        f"🌍 Страна: {c}\n📱 Устройство: {p}\n🎮 Игра: {g}\n\n📨 Отправить заявку администратору?"
-    )
-    kb = InlineKeyboardMarkup([[InlineKeyboardButton("📩 Отправить", callback_data="send_admin")]])
-    await update.message.reply_text(card, reply_markup=kb)
+    c, p, g = ctx.user_data.get("country", "—"), ctx.user_data.get("phone", "—"), ctx.user_data["game"]
+    text = f"🎉 Заявка от {update.effective_user.full_name}\n🌍 {c}\n📱 {p}\n🎮 {g}"
+    kb = [[InlineKeyboardButton("📩 Отправить", callback_data="send_admin")]]
+    await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(kb))
     return CONFIRM
 
 async def send_admin(update: Update, ctx):
-    q = update.callback_query
-    await q.answer()
-    user = q.from_user
+    q = update.callback_query; await q.answer()
     d = ctx.user_data
-    msg = (
-        f"📬 Новая заявка от @{user.username or user.full_name}\n\n"
-        f"🌍 Страна: {d.get('country', '—')}\n📱 Устройство: {d.get('phone', '—')}\n🎮 Игра: {d.get('game', '—')}"
-    )
+    msg = f"📬 Заявка: {d}"
     try:
         await ctx.bot.send_message(ADMIN_CHANNEL_ID, msg)
-        await q.edit_message_text("✅ Заявка отправлена администратору!")
+        await q.edit_message_text("✅ Заявка отправлена!")
     except Exception as e:
         await q.edit_message_text(f"⚠️ Ошибка: {e}")
     return ConversationHandler.END
 
-
-# ==== Админ бот ====
-async def require_admin(update):
-    return update.effective_user.id == ADMIN_ID
+# ==== Админ ====
+async def require_admin(update): return update.effective_user.id == ADMIN_ID
 
 async def cmd_start(update: Update, ctx):
     if not await require_admin(update):
-        await update.message.reply_text("⛔ Нет доступа.")
-        return
-    kb = [
-        [
-            InlineKeyboardButton("🟢 Включить", callback_data="turn_on"),
-            InlineKeyboardButton("🔴 Выключить", callback_data="turn_off"),
-        ],
-        [InlineKeyboardButton("📊 Статус", callback_data="status")]
-    ]
+        await update.message.reply_text("⛔ Нет доступа."); return
+    kb = [[
+        InlineKeyboardButton("🟢 Включить", callback_data="on"),
+        InlineKeyboardButton("🔴 Выключить", callback_data="off")
+    ], [InlineKeyboardButton("📊 Статус", callback_data="status")]]
     st = "🟢 ВКЛЮЧЕН" if is_active() else "🔴 ВЫКЛЮЧЕН"
-    await update.message.reply_text(
-        f"⚙️ Панель администратора\n\nСтатус: {st}",
-        reply_markup=InlineKeyboardMarkup(kb)
-    )
+    await update.message.reply_text(f"⚙️ Панель администратора\nСтатус: {st}",
+        reply_markup=InlineKeyboardMarkup(kb))
 
 async def panel(update: Update, ctx):
-    q = update.callback_query
-    await q.answer()
-    if q.from_user.id != ADMIN_ID:
-        await q.edit_message_text("⛔ Нет доступа.")
-        return
-    data = q.data
-    if data == "turn_on":
-        set_active(True)
-        text = "✅ Основной бот включён."
-    elif data == "turn_off":
-        set_active(False)
-        text = "🚫 Основной бот выключен."
-    else:
-        st = "🟢 ВКЛЮЧЕН" if is_active() else "🔴 ВЫКЛЮЧЕН"
-        text = f"📊 Статус: {st}"
-    kb = [
-        [InlineKeyboardButton("🟢 Включить", callback_data="turn_on"),
-         InlineKeyboardButton("🔴 Выключить", callback_data="turn_off")],
-        [InlineKeyboardButton("📊 Статус", callback_data="status")]
-    ]
-    await q.edit_message_text(f"{text}\n\n⚙️ Панель администратора", reply_markup=InlineKeyboardMarkup(kb))
+    q = update.callback_query; await q.answer()
+    if q.from_user.id != ADMIN_ID: return await q.edit_message_text("⛔ Нет доступа.")
+    if q.data == "on": set_active(True); t="✅ Включён"
+    elif q.data == "off": set_active(False); t="🚫 Выключен"
+    else: t=("🟢 ВКЛЮЧЕН" if is_active() else "🔴 ВЫКЛЮЧЕН")
+    kb = [[InlineKeyboardButton("🟢 Включить", callback_data="on"),
+           InlineKeyboardButton("🔴 Выключить", callback_data="off")],
+           [InlineKeyboardButton("📊 Статус", callback_data="status")]]
+    await q.edit_message_text(f"{t}\n⚙️ Панель администратора", reply_markup=InlineKeyboardMarkup(kb))
 
-
-# ==== Совместный запуск ====
-import os
-from telegram.ext import Application
-
-HEROKU_APP_NAME = "my-telegram"  # замени на имя твоего Heroku-приложения
-PORT = int(os.environ.get('PORT', 8443))
-
+# ==== Запуск обоих на webhook ====
 async def run_both():
-    main_app = Application.builder().token(TOKEN_MAIN).build()
-    admin_app = Application.builder().token(TOKEN_ADMIN).build()
+    main = Application.builder().token(TOKEN_MAIN).build()
+    admin = Application.builder().token(TOKEN_ADMIN).build()
 
     conv = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
-        states={
-            FROM_WHERE: [MessageHandler(filters.TEXT & ~filters.COMMAND, from_where)],
-            PHONE_TYPE: [MessageHandler(filters.TEXT & ~filters.COMMAND, phone)],
-            GAME_TYPE: [MessageHandler(filters.TEXT & ~filters.COMMAND, game)],
-            CONFIRM: [CallbackQueryHandler(send_admin, pattern="send_admin")]
-        },
-        fallbacks=[]
-    )
-    main_app.add_handler(conv)
+        states={FROM_WHERE:[MessageHandler(filters.TEXT & ~filters.COMMAND, from_where)],
+                PHONE_TYPE:[MessageHandler(filters.TEXT & ~filters.COMMAND, phone)],
+                GAME_TYPE:[MessageHandler(filters.TEXT & ~filters.COMMAND, game)],
+                CONFIRM:[CallbackQueryHandler(send_admin, pattern="send_admin")]},
+        fallbacks=[])
+    main.add_handler(conv)
+    admin.add_handler(CommandHandler("start", cmd_start))
+    admin.add_handler(CallbackQueryHandler(panel))
 
-    admin_app.add_handler(CommandHandler("start", cmd_start))
-    admin_app.add_handler(CallbackQueryHandler(panel))
+    # webhook‑URLs
+    url_main = f"[{heroku_app_name}.herokuapp.com](https://{HEROKU_APP_NAME}.herokuapp.com/{TOKEN_MAIN})"
+    url_admin = f"[{heroku_app_name}.herokuapp.com](https://{HEROKU_APP_NAME}.herokuapp.com/{TOKEN_ADMIN})"
 
-    await main_app.initialize()
-    await admin_app.initialize()
+    await main.bot.setWebhook(url=url_main)
+    await admin.bot.setWebhook(url=url_admin)
+    print("🌐 Вебхуки установлены")
 
-    print("✅ Оба бота инициализированы")
-
-    # Webhook URL
-    webhook_url_main = f"[{heroku_app_name}.herokuapp.com](https://{HEROKU_APP_NAME}.herokuapp.com/{TOKEN_MAIN})"
-    webhook_url_admin = f"[{heroku_app_name}.herokuapp.com](https://{HEROKU_APP_NAME}.herokuapp.com/{TOKEN_ADMIN})"
-
-    await main_app.bot.setWebhook(url=webhook_url_main)
-    await admin_app.bot.setWebhook(url=webhook_url_admin)
-
-    await main_app.start()
-    await admin_app.start()
-
-    print(f"🌐 Вебхуки выставлены:\n{webhook_url_main}\n{webhook_url_admin}")
-
-    from aiohttp import web
     app = web.Application()
     app.add_routes([
-        web.post(f"/{TOKEN_MAIN}", main_app.webhook_handler),
-        web.post(f"/{TOKEN_ADMIN}", admin_app.webhook_handler),
+        web.post(f"/{TOKEN_MAIN}", main.webhook_handler),
+        web.post(f"/{TOKEN_ADMIN}", admin.webhook_handler),
     ])
-    runner = web.AppRunner(app)
-    await runner.setup()
+    runner = web.AppRunner(app); await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", PORT)
     await site.start()
-
-    print(f"🚀 Слушаем порт {PORT} на Heroku...")
-    await asyncio.Event().wait()  # держим приложение живым
+    print(f"🚀 Слушаем порт {PORT} на Heroku…")
+    await asyncio.Event().wait()
 
 if __name__ == "__main__":
     asyncio.run(run_both())
