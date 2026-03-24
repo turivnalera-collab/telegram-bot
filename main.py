@@ -1,4 +1,4 @@
-import json, asyncio
+import json, asyncio, nest_asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
@@ -6,15 +6,17 @@ from telegram.ext import (
     ContextTypes, filters
 )
 
-# === Настройки ===
-TOKEN = "8265115212:AAHkqg6km67v_GJOTpjKVHTW8pKy6zSXbUc"   # ← подставь свой
+# Применяем патч для Heroku — решает ошибку event loop
+nest_asyncio.apply()
+
+TOKEN = "8265115212:AAHkqg6km67v_GJOTpjKVHTW8pKy6zSXbUc"
 ADMIN_ID = 607368382
 ADMIN_CHANNEL_ID = -1003568920377
 STATE_FILE = "state.json"
 
 (FROM_WHERE, PHONE_TYPE, GAME_TYPE, CONFIRM) = range(4)
 
-# === Работа с состоянием ===
+# === Работа с JSON-состоянием ===
 def get_state():
     try:
         with open(STATE_FILE, "r") as f:
@@ -42,26 +44,26 @@ def update_user(uid):
         with open(STATE_FILE, "w") as f:
             json.dump(s, f)
 
-# === Основные диалоги ===
+# === Основной диалог пользователя ===
 async def block_if_off(update: Update):
     if not is_active():
         await update.message.reply_text("🚫 Бот временно выключен администратором.")
         return True
     return False
 
-async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+async def start(update: Update, ctx):
     if await block_if_off(update):
         return ConversationHandler.END
     update_user(update.effective_user.id)
-    await update.message.reply_text("Привет 👋, заполни заявку 📋")
     countries = [["Украина 🇺🇦"], ["Казахстан 🇰🇿"], ["Россия 🇷🇺"], ["Другое 🌐"]]
+    await update.message.reply_text("Привет 👋, заполни заявку 📋")
     await update.message.reply_text(
         "Откуда вы?",
         reply_markup={"keyboard": countries, "resize_keyboard": True, "one_time_keyboard": True}
     )
     return FROM_WHERE
 
-async def from_where(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+async def from_where(update: Update, ctx):
     ctx.user_data["country"] = update.message.text
     phones = [["iOS 🍎"], ["Android 🤖"]]
     await update.message.reply_text(
@@ -70,15 +72,13 @@ async def from_where(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     )
     return PHONE_TYPE
 
-async def phone(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+async def phone(update: Update, ctx):
     ctx.user_data["phone"] = update.message.text
     if ctx.user_data["phone"] == "Android 🤖":
         c = ctx.user_data.get("country", "—")
         text = f"🎉 Заявка:\n🌍 {c}\n📱 Android 🤖\n💵 Платно"
         await update.message.reply_text(
-            text, reply_markup=InlineKeyboardMarkup(
-                [[InlineKeyboardButton("📩 Отправить", callback_data="send_admin")]]
-            )
+            text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📩 Отправить", callback_data="send_admin")]])
         )
         return CONFIRM
     games = [["Standoff 🔫"], ["PUBG 🎯"], ["Clash of Clans ⚔️"]]
@@ -88,20 +88,18 @@ async def phone(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     )
     return GAME_TYPE
 
-async def game(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+async def game(update: Update, ctx):
     ctx.user_data["game"] = update.message.text
     c = ctx.user_data.get("country", "—")
     p = ctx.user_data.get("phone", "—")
     g = ctx.user_data["game"]
     text = f"🎉 Заявка:\n🌍 {c}\n📱 {p}\n🎮 {g}"
     await update.message.reply_text(
-        text, reply_markup=InlineKeyboardMarkup(
-            [[InlineKeyboardButton("📩 Отправить", callback_data="send_admin")]]
-        )
+        text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📩 Отправить", callback_data="send_admin")]])
     )
     return CONFIRM
 
-async def send_admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+async def send_admin(update: Update, ctx):
     q = update.callback_query
     await q.answer()
     user = q.from_user
@@ -114,21 +112,20 @@ async def send_admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await q.edit_message_text("✅ Отправлено администратору!")
     return ConversationHandler.END
 
-# === Команды администратора ===
-async def admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+# === Админка ===
+async def admin(update: Update, ctx):
     if update.effective_user.id != ADMIN_ID:
         return await update.message.reply_text("⛔ Нет доступа.")
     kb = [
-        [
-            InlineKeyboardButton("🟢 Включить", callback_data="on"),
-            InlineKeyboardButton("🔴 Выключить", callback_data="off")
-        ],
+        [InlineKeyboardButton("🟢 Включить", callback_data="on"),
+         InlineKeyboardButton("🔴 Выключить", callback_data="off")],
         [InlineKeyboardButton("📊 Статус", callback_data="status")]
     ]
     st = "🟢 ВКЛЮЧЕН" if is_active() else "🔴 ВЫКЛЮЧЕН"
-    await update.message.reply_text(f"⚙️ Панель администратора\nСтатус: {st}", reply_markup=InlineKeyboardMarkup(kb))
+    await update.message.reply_text(f"⚙️ Панель администратора\nСтатус: {st}",
+                                    reply_markup=InlineKeyboardMarkup(kb))
 
-async def panel(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+async def panel(update: Update, ctx):
     q = update.callback_query
     await q.answer()
     if q.from_user.id != ADMIN_ID:
@@ -141,14 +138,17 @@ async def panel(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         t = "🚫 Выключен"
     else:
         t = "📊 Статус: " + ("🟢 ВКЛЮЧЕН" if is_active() else "🔴 ВЫКЛЮЧЕН")
+
     kb = [
-        [InlineKeyboardButton("🟢 Включить", callback_data="on"), InlineKeyboardButton("🔴 Выключить", callback_data="off")],
+        [InlineKeyboardButton("🟢 Включить", callback_data="on"),
+         InlineKeyboardButton("🔴 Выключить", callback_data="off")],
         [InlineKeyboardButton("📊 Статус", callback_data="status")]
     ]
-    await q.edit_message_text(f"{t}\n⚙️ Панель администратора", reply_markup=InlineKeyboardMarkup(kb))
+    await q.edit_message_text(f"{t}\n⚙️ Панель администратора",
+                              reply_markup=InlineKeyboardMarkup(kb))
 
 # === Запуск ===
-async def main():
+def run():
     app = Application.builder().token(TOKEN).build()
 
     conv = ConversationHandler(
@@ -166,10 +166,11 @@ async def main():
     app.add_handler(CallbackQueryHandler(panel))
 
     print("🚀 Бот запущен…")
-    await app.run_polling()
+    app.run_polling(close_loop=False)  # ключевой параметр для Heroku
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    run()
+
 
 
 
