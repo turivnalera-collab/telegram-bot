@@ -158,27 +158,26 @@ async def main():
         fallbacks=[]
     )
     main_app.add_handler(conv)
-
     admin_app.add_handler(CommandHandler("start", cmd_start))
     admin_app.add_handler(CallbackQueryHandler(panel))
 
-print("🟢 Приложения создаются...")
-# инициализация обоих
-await main_app.initialize()
-await admin_app.initialize()
-# запуск polling
-print("🚀 Боты запускаются...")
-await asyncio.gather(
-    main_app.start(),
-    admin_app.start(),
-    main_app.updater.start_polling(),
-    admin_app.updater.start_polling(),
-)
+    print("🟢 Приложения создаются...")
 
+    # ↓ вот эти две строки тоже должны иметь 4 пробела!
+    await main_app.initialize()
+    await admin_app.initialize()
 
+    print("🚀 Боты запускаются...")
+    await asyncio.gather(
+        main_app.start(),
+        admin_app.start(),
+        main_app.updater.start_polling(),
+        admin_app.updater.start_polling(),
+    )
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
 
