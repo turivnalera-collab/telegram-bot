@@ -10,7 +10,6 @@ from telegram.ext import (
 
 nest_asyncio.apply()
 
-# 🔑 Вставь свои данные ниже:
 TOKEN_MAIN = "8265115212:AAHkqg6km67v_GJOTpjKVHTW8pKy6zSXbUc"
 TOKEN_ADMIN = "8629071305:AAEWcYh4KQgDOcJdJxy1XjKzNc7aEZm2ZpY"
 ADMIN_ID = 607368382  # твой Telegram ID
@@ -100,21 +99,6 @@ async def send_admin(update: Update, ctx):
     except Exception as e:
         await q.edit_message_text(f"⚠️ Ошибка: {e}")
     return ConversationHandler.END
-
-async def main_bot():
-    app = Application.builder().token(TOKEN_MAIN).build()
-    conv = ConversationHandler(
-        entry_points=[CommandHandler("start", start)],
-        states={
-            FROM_WHERE: [MessageHandler(filters.TEXT & ~filters.COMMAND, from_where)],
-            PHONE_TYPE: [MessageHandler(filters.TEXT & ~filters.COMMAND, phone)],
-            GAME_TYPE: [MessageHandler(filters.TEXT & ~filters.COMMAND, game)],
-            CONFIRM: [CallbackQueryHandler(send_admin, pattern="send_admin")]
-        }, fallbacks=[]
-    )
-    app.add_handler(conv)
-    print("🟢 Основной бот запущен.")
-    await app.run_polling()
 
 # =================== АДМИН-БОТ С ПАНЕЛЬЮ ===================
 async def require_admin(update):
