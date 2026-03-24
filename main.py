@@ -173,24 +173,21 @@ async def run_both():
 
 import asyncio
 import nest_asyncio
-import asyncio
-
-nest_asyncio.apply()
-loop = asyncio.get_event_loop()
-loop.create_task(run_both())
-loop.run_forever()
-import asyncio
-import nest_asyncio
 
 nest_asyncio.apply()
 
-async def main():
-    await run_both()
+async def run_both():
+    task1 = asyncio.create_task(main_bot())
+    await asyncio.sleep(2)
+    task2 = asyncio.create_task(main_admin())
+    await asyncio.gather(task1, task2)
 
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
-    loop.create_task(main())
+    loop.create_task(run_both())
+    print("Бот запущен и работает бесконечно 🚀")
     loop.run_forever()
+
 
 
 
