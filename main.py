@@ -1,12 +1,10 @@
-import json, nest_asyncio, asyncio
+import json, asyncio
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
     ConversationHandler, CallbackQueryHandler,
     ContextTypes, filters
 )
-
-nest_asyncio.apply()  # Важно для работы с asyncio на Heroku
 
 # 🔑 Вставь свои данные ниже:
 TOKEN_MAIN = "8265115212:AAHkqg6km67v_GJOTpjKVHTW8pKy6zSXbUc"
@@ -28,15 +26,18 @@ def get_state():
         return s
 
 def set_active(v: bool):
-    s = get_state(); s["active"] = v
+    s = get_state()
+    s["active"] = v
     with open(STATE_FILE, "w") as f: json.dump(s, f)
 
 def is_active(): return get_state().get("active", True)
 
 def update_user(uid):
-    s = get_state(); s.setdefault("user_ids", [])
+    s = get_state()
+    s.setdefault("user_ids", [])
     if uid not in s["user_ids"]:
-        s["user_ids"].append(uid); s["users"] = len(s["user_ids"])
+        s["user_ids"].append(uid)
+        s["users"] = len(s["user_ids"])
         with open(STATE_FILE, "w") as f: json.dump(s, f)
 
 # =================== ОСНОВНОЙ БОТ ===================
@@ -86,8 +87,10 @@ async def game(update: Update, ctx):
     return CONFIRM
 
 async def send_admin(update: Update, ctx):
-    q = update.callback_query; await q.answer()
-    user = q.from_user; d = ctx.user_data
+    q = update.callback_query
+    await q.answer()
+    user = q.from_user
+    d = ctx.user_data
     msg = (f"📬 Новая заявка от @{user.username or user.full_name}\n\n"
            f"🌍 Страна: {d.get('country', '—')}\n📱 Устройство: {d.get('phone', '—')}\n🎮 Игра: {d.get('game', '—')}")
     try:
@@ -112,6 +115,7 @@ async def main_bot():
     print("🟢 Основной бот запущен.")
     await app.run_polling()
 
+# =================== АДМИН-БОТ С ПАНЕЛЬЮ ===================
 async def require_admin(update):
     return update.effective_user.id == ADMIN_ID
 
