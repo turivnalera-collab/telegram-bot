@@ -1,5 +1,5 @@
 python-telegram-bot==20.3
-nest_asyncio==1.5.4
-httpcore==0.15.0
+Flask==3.0.3
+gunicorn==22.0.0
 
 
