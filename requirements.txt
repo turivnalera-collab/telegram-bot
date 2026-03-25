@@ -1,5 +1,5 @@
 python-telegram-bot==20.3
 nest_asyncio==1.5.4
-httpx==0.21.1
+httpcore==0.13.6
 
 
