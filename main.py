@@ -1,16 +1,17 @@
-import json, asyncio
+import json, asyncio, nest_asyncio
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
     ConversationHandler, CallbackQueryHandler,
     ContextTypes, filters
 )
+nest_asyncio.apply()
 
 # 🔑 Вставь свои данные ниже:
-TOKEN_MAIN = "8265115212:AAHkqg6km67v_GJOTpjKVHTW8pKy6zSXbUc"
+TOKEN_MAIN  = "8265115212:AAHkqg6km67v_GJOTpjKVHTW8pKy6zSXbUc"
 TOKEN_ADMIN = "8629071305:AAEWcYh4KQgDOcJdJxy1XjKzNc7aEZm2ZpY"
-ADMIN_ID = 607368382  # твой Telegram ID
-ADMIN_CHANNEL_ID = -1003568920377  # ID канала/группы
+ADMIN_ID = 607368382                    # твой Telegram ID
+ADMIN_CHANNEL_ID = -1003568920377       # ID канала/группы
 STATE_FILE = "state.json"
 
 (FROM_WHERE, PHONE_TYPE, GAME_TYPE, CONFIRM) = range(4)
@@ -26,18 +27,15 @@ def get_state():
         return s
 
 def set_active(v: bool):
-    s = get_state()
-    s["active"] = v
+    s = get_state(); s["active"] = v
     with open(STATE_FILE, "w") as f: json.dump(s, f)
 
 def is_active(): return get_state().get("active", True)
 
 def update_user(uid):
-    s = get_state()
-    s.setdefault("user_ids", [])
+    s = get_state(); s.setdefault("user_ids", [])
     if uid not in s["user_ids"]:
-        s["user_ids"].append(uid)
-        s["users"] = len(s["user_ids"])
+        s["user_ids"].append(uid); s["users"] = len(s["user_ids"])
         with open(STATE_FILE, "w") as f: json.dump(s, f)
 
 # =================== ОСНОВНОЙ БОТ ===================
