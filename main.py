@@ -172,7 +172,10 @@ async def run_both():
     t2=asyncio.create_task(main_admin())
     await asyncio.gather(t1,t2)
 
-await run_both()
+import asyncio
+if __name__ == "__main__":
+    asyncio.run(run_both())
+
 
 
 
