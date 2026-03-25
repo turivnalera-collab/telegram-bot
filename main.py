@@ -1,4 +1,12 @@
-!pip install python-telegram-bot==20.3 nest_asyncio
+import json, asyncio, nest_asyncio
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.ext import (
+    Application, CommandHandler, MessageHandler,
+    ConversationHandler, CallbackQueryHandler,
+    ContextTypes, filters
+)
+nest_asyncio.apply()
+...
 
 # =================== Все импорты и настройки ===================
 import json, nest_asyncio, asyncio
