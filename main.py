@@ -69,7 +69,7 @@ async def phone(update: Update, ctx):
         kb = InlineKeyboardMarkup([[InlineKeyboardButton("📩 Отправить", callback_data="send_admin")]])
         await update.message.reply_text(card, reply_markup=kb)
         return CONFIRM
-    games = [['Standoff 🔫'], ['PUBG 🎯'], ['Clash of Clans ⚔️']]
+    games = [['Standoff 🔫'], ['PUBG 🎯'], ['Minecraft ⛏️']]
     await update.message.reply_text("На какую игру нужен софт? 🎮", reply_markup={"keyboard": games, "resize_keyboard": True, "one_time_keyboard": True})
     return GAME_TYPE
 
